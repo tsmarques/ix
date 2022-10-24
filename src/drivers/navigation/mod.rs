@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use actix::prelude::*;
 use actix_broker::{BrokerIssue, BrokerSubscribe, SystemBroker};
 use std::time::Duration;
+use imc::DevDataText::DevDataText;
 
 use crate::task;
 use crate::TaskBehaviour;
@@ -40,6 +41,7 @@ impl Actor for Task {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         subscribe_to!(GpsFix, self, ctx);
+        subscribe_to!(DevDataText, self, ctx);
 
         start_main_loop!(1000, ctx);
     }
@@ -54,5 +56,13 @@ impl Handler<MessageWrapper<GpsFix>> for Task {
 
     fn handle(&mut self, msg: MessageWrapper<GpsFix>, _ctx: &mut Self::Context) {
         println!("Navigation Received: {:?}", msg.0._header._mgid);
+    }
+}
+
+impl Handler<MessageWrapper<DevDataText>> for Task {
+    type Result = ();
+
+    fn handle(&mut self, msg: MessageWrapper<DevDataText>, _ctx: &mut Self::Context) {
+        println!("nav: {}", msg.0._value);
     }
 }

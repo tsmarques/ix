@@ -9,10 +9,6 @@ pub enum Sentence {
     /// Course over Ground and Ground Speed
     VTG(DataVTG),
     /// GNSS DOP and Active Satellites
-    GSA(DataGSA),
-    /// GNSS DOP and Active Satellites
-    GSV(DataGSV),
-    /// GNSS DOP and Active Satellites
     RMC(DataRMC),
     /// Time and Date
     ZDA(DataZDA),
@@ -22,6 +18,8 @@ impl Sentence {
     pub fn from(s: &String) -> Sentence {
         if s.ends_with("GGA") {
             return Sentence::GGA(Default::default());
+        } else if s.ends_with("VTG") {
+            return Sentence::VTG(Default::default());
         } else if s.ends_with("RMC") {
             return Sentence::RMC(Default::default());
         } else if s.ends_with("VTG") {
@@ -118,7 +116,7 @@ impl Parser {
             }
             Field::Data => {
                 if c == '*' {
-                    if !parse_fields(&mut self.sntc, self.bfr.as_str()) {
+                    if !parse_fields(&mut self.sntc, self.bfr.clone()) {
                         return self.fail_with(InvalidFields);
                     }
 
@@ -166,6 +164,7 @@ mod utils {
 
 mod tests {
     use crate::drivers::gps::nmea::State::OnGoing;
+
     use super::*;
 
     #[test]

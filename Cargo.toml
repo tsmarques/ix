@@ -9,4 +9,5 @@ edition = "2021"
 ctrlc = "3.2.3"
 actix = "0.13"
 actix-broker = "0.4.3"
+serialport = "4.2.0"
 imc = {path = "../imc-rust" }

@@ -1,28 +1,33 @@
-use std::thread::Thread;
 use std::{thread, time};
 use std::sync::{Arc, Barrier};
 use std::sync::atomic::{AtomicBool, Ordering};
-use actix::prelude::*;
-use actix_broker::{BrokerIssue, BrokerSubscribe, SystemBroker};
+use std::thread::Thread;
 use std::time::Duration;
 
+use actix::prelude::*;
+use actix_broker::{BrokerIssue, BrokerSubscribe, SystemBroker};
+use imc::DevDataText::DevDataText;
+use imc::GpsFix::GpsFix;
+use imc::Message::Message;
+use serialport::SerialPort;
+
+use crate::BrokerType;
+use crate::drivers::gps::nmea::{Sentence, State};
+use crate::MessageWrapper;
 use crate::task;
 use crate::TaskBehaviour;
-use crate::MessageWrapper;
-use crate::BrokerType;
-
-use imc::Message::Message;
-use imc::GpsFix::GpsFix;
 
 mod nmea;
 mod sentences;
-
+mod field_reader;
 
 // Task fields' definition
 pub struct Task {
-    pub ctx :task::Context,
-    pub fix :GpsFix,
-    pub parser :nmea::Parser,
+    pub ctx: task::Context,
+    pub fix: GpsFix,
+    pub parser: nmea::Parser,
+    pub io: Option<Box<dyn SerialPort>>,
+    pub bfr: String,
 }
 
 // Task Trait implementation
@@ -41,15 +46,135 @@ impl TaskBehaviour for Task {
 
 impl Task {
     pub fn new(context: task::Context) -> Task {
-       Task {
-           ctx: context,
-           fix: Default::default(),
-           parser: nmea::Parser::new(),
-       }
+        Task {
+            ctx: context,
+            fix: Default::default(),
+            parser: nmea::Parser::new(),
+            io: None,
+            bfr: String::from(""),
+        }
     }
 
+    fn handle_latitude(&mut self, lat_field: Option<f64>, ns_field: Option<String>) -> bool {
+        if lat_field.is_some() && ns_field.is_some() {
+            let ns = ns_field.unwrap();
+
+            self.fix._lat = lat_field.unwrap();
+            if ns == "S" {
+                self.fix._lat = -self.fix._lat;
+            }
+
+            return true;
+        }
+        false
+    }
+
+    fn handle_longitude(&mut self, lon_field: Option<f64>, ew_field: Option<String>) -> bool {
+        if lon_field.is_some() && ew_field.is_some() {
+            let ew = ew_field.unwrap();
+
+            self.fix._lon = lon_field.unwrap();
+            if ew == "W" {
+                self.fix._lon = -self.fix._lon;
+            }
+
+            return true;
+        }
+        false
+    }
+
+    /// Handle sentence and feed corresponding IMC messages
+    fn handle_sentence(&mut self, sentence: Sentence) {
+        match sentence {
+            Sentence::Invalid => println!("ERROR: unknown sentence"),
+            /// Handle GGA Sentence
+            Sentence::GGA(m) => {
+                println!("debug: GGA");
+                if m.validity == 1 {
+                    self.fix._type = imc::GpsFix::TypeEnum::GFT_STANDALONE as u8;
+                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_POS as u16);
+                } else if m.validity == 2 {
+                    self.fix._type = imc::GpsFix::TypeEnum::GFT_DIFFERENTIAL as u8;
+                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_POS as u16);
+                }
+
+                if self.handle_latitude(m.lat, m.ns) &&
+                   self.handle_longitude(m.lon, m.ew) &&
+                   m.alt.is_some() && m.sat.is_some() {
+                    self.fix._height += m.gsep.unwrap();
+                    self.fix._lat = self.fix._lat.to_radians();
+                    self.fix._lon = self.fix._lon.to_radians();
+                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_POS as u16);
+                } else {
+                    self.fix._validity &= !(imc::GpsFix::ValidityBits::GFV_VALID_POS as u16);
+                }
+
+                if let Some(hdop) = m.hdop {
+                    self.fix._hdop = hdop;
+                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_HDOP as u16);
+                }
+            }
+            Sentence::VTG(m) => {
+                // @fixme: magnetic or true?
+                if let Some(cog) = m.cog_true {
+                    //@todo normalize angles
+                    self.fix._cog = cog.to_radians();
+                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_COG as u16);
+                }
+
+                if let Some(sog) = m.sog_kph {
+                    // to mps
+                    self.fix._sog = sog * 1000.0 / 3600.0;
+                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_SOG as u16);
+                }
+            },
+            Sentence::RMC(m) => println!("RMC"),
+            Sentence::ZDA(m) => {
+                if m.utc.is_some() {
+                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_TIME as u16);
+                }
+
+                if m.day.is_some() &&
+                   m.month.is_some() &&
+                   m.year.is_some() {
+                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_TIME as u16);
+                }
+            },
+        }
+
+        /// Log received sentence
+        let mut log = DevDataText::new();
+        log._value = self.bfr.clone();
+        send_message!(self, imc::DevDataText::DevDataText, log);
+    }
+
+    /// Main loop
     fn on_main(&mut self, _context: &mut Context<Self>) {
-        send_message!(self, GpsFix, GpsFix::new());
+        let mut serial_buf: Vec<u8> = vec![0; 1024];
+        self.io.as_mut().unwrap().read(serial_buf.as_mut_slice()).expect("Found no data!");
+
+        for b in serial_buf {
+            let c = b as char;
+            if c == '\n' {
+                self.parser.reset();
+                self.bfr.clear();
+                continue;
+            }
+
+            self.bfr.push(c);
+            match self.parser.push(c) {
+                Ok(sentence) => self.handle_sentence(sentence),
+                Err(e) => {
+                    match e {
+                        State::InvalidId(id) => println!("unsupported sentence id: {}", id),
+                        State::InvalidFields => println!("ERROR: invalid message fields"),
+                        State::ChecksumMismatch { expected, received } => println!("ERROR: mismatch: expected {}, received {}",
+                                                                                   expected, received),
+                        _ => {}
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -59,20 +184,11 @@ impl Actor for Task {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        /// register subscriptions
-        subscribe_to!(u16, self, ctx);
+        self.io = Some(serialport::new("/dev/ttyACM0", 115_200)
+        .timeout(Duration::from_millis(10))
+        .open().expect("Failed to open port"));
 
         /// go
         start_main_loop!(1000, ctx);
-    }
-}
-
-// Consumers
-
-impl Handler<MessageWrapper<u16>> for Task {
-    type Result = ();
-
-    fn handle(&mut self, msg: MessageWrapper<u16>, _ctx: &mut Self::Context) {
-        println!("Gps Received: {:?}", msg.0);
     }
 }
