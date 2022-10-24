@@ -7,18 +7,18 @@ use actix_broker::{BrokerIssue, BrokerSubscribe, SystemBroker};
 use std::time::Duration;
 
 use crate::task;
-use crate::Task;
+use crate::TaskBehaviour;
 use crate::MessageWrapper;
 use crate::BrokerType;
 
 use imc::Message::Message;
 use imc::GpsFix::GpsFix;
 
-pub struct Navigation {
+pub struct Task {
     pub ctx :task::Context,
 }
 
-impl Task for Navigation {
+impl TaskBehaviour for Task {
     fn get_ctx(&self) -> &task::Context {
         &self.ctx
     }
@@ -29,13 +29,13 @@ impl Task for Navigation {
 }
 
 
-impl Navigation {
+impl Task {
     fn on_main(&mut self, _context: &mut Context<Self>) {
         self.issue_async::<BrokerType, MessageWrapper<u16>>(MessageWrapper { 0: 2} );
     }
 }
 
-impl Actor for Navigation {
+impl Actor for Task {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
@@ -49,7 +49,7 @@ impl Actor for Navigation {
     }
 }
 
-impl Handler<MessageWrapper<GpsFix>> for Navigation {
+impl Handler<MessageWrapper<GpsFix>> for Task {
     type Result = ();
 
     fn handle(&mut self, msg: MessageWrapper<GpsFix>, _ctx: &mut Self::Context) {

@@ -36,7 +36,7 @@ pub struct Context {
     pub running: Arc<AtomicBool>,
 }
 
-pub trait Task {
+pub trait TaskBehaviour {
     fn get_ctx(&self) -> &Context;
     fn get_name(&self) -> &str;
 

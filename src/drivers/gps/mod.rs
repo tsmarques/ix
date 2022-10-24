@@ -7,7 +7,7 @@ use actix_broker::{BrokerIssue, BrokerSubscribe, SystemBroker};
 use std::time::Duration;
 
 use crate::task;
-use crate::Task;
+use crate::TaskBehaviour;
 use crate::MessageWrapper;
 use crate::BrokerType;
 
@@ -19,7 +19,7 @@ mod sentences;
 
 
 // Task fields' definition
-pub struct GpsDriver {
+pub struct Task {
     pub ctx :task::Context,
     pub fix :GpsFix,
     pub parser :nmea::Parser,
@@ -27,7 +27,7 @@ pub struct GpsDriver {
 
 // Task Trait implementation
 
-impl Task for GpsDriver {
+impl TaskBehaviour for Task {
     fn get_ctx(&self) -> &task::Context {
         &self.ctx
     }
@@ -39,9 +39,9 @@ impl Task for GpsDriver {
 
 // Task specific behaviour (main loop, etc)
 
-impl GpsDriver {
-    pub fn new(context: task::Context) -> GpsDriver {
-       GpsDriver {
+impl Task {
+    pub fn new(context: task::Context) -> Task {
+       Task {
            ctx: context,
            fix: Default::default(),
            parser: nmea::Parser::new(),
@@ -55,7 +55,7 @@ impl GpsDriver {
 
 // Task lifecycle
 
-impl Actor for GpsDriver {
+impl Actor for Task {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
@@ -69,7 +69,7 @@ impl Actor for GpsDriver {
 
 // Consumers
 
-impl Handler<MessageWrapper<u16>> for GpsDriver {
+impl Handler<MessageWrapper<u16>> for Task {
     type Result = ();
 
     fn handle(&mut self, msg: MessageWrapper<u16>, _ctx: &mut Self::Context) {
