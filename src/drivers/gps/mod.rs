@@ -99,8 +99,8 @@ impl Task {
                 }
 
                 if self.handle_latitude(m.lat, m.ns) &&
-                   self.handle_longitude(m.lon, m.ew) &&
-                   m.alt.is_some() && m.sat.is_some() {
+                self.handle_longitude(m.lon, m.ew) &&
+                m.alt.is_some() && m.sat.is_some() {
                     self.fix._height += m.gsep.unwrap();
                     self.fix._lat = self.fix._lat.to_radians();
                     self.fix._lon = self.fix._lon.to_radians();
@@ -127,7 +127,7 @@ impl Task {
                     self.fix._sog = sog * 1000.0 / 3600.0;
                     self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_SOG as u16);
                 }
-            },
+            }
             Sentence::RMC(m) => println!("RMC"),
             Sentence::ZDA(m) => {
                 if m.utc.is_some() {
@@ -135,17 +135,12 @@ impl Task {
                 }
 
                 if m.day.is_some() &&
-                   m.month.is_some() &&
-                   m.year.is_some() {
+                m.month.is_some() &&
+                m.year.is_some() {
                     self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_TIME as u16);
                 }
-            },
+            }
         }
-
-        /// Log received sentence
-        let mut log = DevDataText::new();
-        log._value = self.bfr.clone();
-        send_message!(self, imc::DevDataText::DevDataText, log);
     }
 
     /// Main loop
@@ -156,6 +151,12 @@ impl Task {
         for b in serial_buf {
             let c = b as char;
             if c == '\n' {
+                /// Log received sentence
+                let mut log = DevDataText::new();
+                log._value = self.bfr.clone();
+                send_message!(self, imc::DevDataText::DevDataText, log);
+
+                // reset state
                 self.parser.reset();
                 self.bfr.clear();
                 continue;
@@ -164,15 +165,10 @@ impl Task {
             self.bfr.push(c);
             match self.parser.push(c) {
                 Ok(sentence) => self.handle_sentence(sentence),
-                Err(e) => {
-                    match e {
-                        State::InvalidId(id) => println!("unsupported sentence id: {}", id),
-                        State::InvalidFields => println!("ERROR: invalid message fields"),
-                        State::ChecksumMismatch { expected, received } => println!("ERROR: mismatch: expected {}, received {}",
-                                                                                   expected, received),
-                        _ => {}
-                    }
-                }
+                Err(State::InvalidId(id)) => println!("unsupported sentence id: {}", id),
+                Err(State::InvalidFields) => println!("ERROR: invalid message fields"),
+                Err(State::ChecksumMismatch { expected, received }) => println!("ERROR: mismatch: expected {}, received {}", expected, received),
+                _ => {}
             }
         }
     }
