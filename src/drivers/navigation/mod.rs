@@ -1,22 +1,22 @@
-use std::thread::Thread;
-use std::{thread, time};
-use std::sync::{Arc, Barrier};
-use std::sync::atomic::{AtomicBool, Ordering};
 use actix::prelude::*;
 use actix_broker::{BrokerIssue, BrokerSubscribe, SystemBroker};
-use std::time::Duration;
 use imc::DevDataText::DevDataText;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Barrier};
+use std::thread::Thread;
+use std::time::Duration;
+use std::{thread, time};
 
 use crate::task;
-use crate::TaskBehaviour;
-use crate::MessageWrapper;
 use crate::BrokerType;
+use crate::MessageWrapper;
+use crate::TaskBehaviour;
 
-use imc::Message::Message;
 use imc::GpsFix::GpsFix;
+use imc::Message::Message;
 
 pub struct Task {
-    pub ctx :task::Context,
+    pub ctx: task::Context,
 }
 
 impl TaskBehaviour for Task {
@@ -29,10 +29,9 @@ impl TaskBehaviour for Task {
     }
 }
 
-
 impl Task {
     fn on_main(&mut self, _context: &mut Context<Self>) {
-        self.issue_async::<BrokerType, MessageWrapper<u16>>(MessageWrapper { 0: 2} );
+        self.issue_async::<BrokerType, MessageWrapper<u16>>(MessageWrapper { 0: 2 });
     }
 }
 

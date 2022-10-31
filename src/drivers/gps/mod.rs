@@ -1,8 +1,8 @@
-use std::{thread, time};
-use std::sync::{Arc, Barrier};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Barrier};
 use std::thread::Thread;
 use std::time::Duration;
+use std::{thread, time};
 
 use actix::prelude::*;
 use actix_broker::{BrokerIssue, BrokerSubscribe, SystemBroker};
@@ -11,15 +11,15 @@ use imc::GpsFix::GpsFix;
 use imc::Message::Message;
 use serialport::SerialPort;
 
-use crate::BrokerType;
 use crate::drivers::gps::nmea::{Sentence, State};
-use crate::MessageWrapper;
 use crate::task;
+use crate::BrokerType;
+use crate::MessageWrapper;
 use crate::TaskBehaviour;
 
+mod field_reader;
 mod nmea;
 mod sentences;
-mod field_reader;
 
 // Task fields' definition
 pub struct Task {
@@ -98,9 +98,11 @@ impl Task {
                     self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_POS as u16);
                 }
 
-                if self.handle_latitude(m.lat, m.ns) &&
-                self.handle_longitude(m.lon, m.ew) &&
-                m.alt.is_some() && m.sat.is_some() {
+                if self.handle_latitude(m.lat, m.ns)
+                    && self.handle_longitude(m.lon, m.ew)
+                    && m.alt.is_some()
+                    && m.sat.is_some()
+                {
                     self.fix._height += m.gsep.unwrap();
                     self.fix._lat = self.fix._lat.to_radians();
                     self.fix._lon = self.fix._lon.to_radians();
@@ -134,9 +136,7 @@ impl Task {
                     self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_TIME as u16);
                 }
 
-                if m.day.is_some() &&
-                m.month.is_some() &&
-                m.year.is_some() {
+                if m.day.is_some() && m.month.is_some() && m.year.is_some() {
                     self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_TIME as u16);
                 }
             }
@@ -146,7 +146,11 @@ impl Task {
     /// Main loop
     fn on_main(&mut self, _context: &mut Context<Self>) {
         let mut serial_buf: Vec<u8> = vec![0; 1024];
-        self.io.as_mut().unwrap().read(serial_buf.as_mut_slice()).expect("Found no data!");
+        self.io
+            .as_mut()
+            .unwrap()
+            .read(serial_buf.as_mut_slice())
+            .expect("Found no data!");
 
         for b in serial_buf {
             let c = b as char;
@@ -167,7 +171,10 @@ impl Task {
                 Ok(sentence) => self.handle_sentence(sentence),
                 Err(State::InvalidId(id)) => println!("unsupported sentence id: {}", id),
                 Err(State::InvalidFields) => println!("ERROR: invalid message fields"),
-                Err(State::ChecksumMismatch { expected, received }) => println!("ERROR: mismatch: expected {}, received {}", expected, received),
+                Err(State::ChecksumMismatch { expected, received }) => println!(
+                    "ERROR: mismatch: expected {}, received {}",
+                    expected, received
+                ),
                 _ => {}
             }
         }
@@ -180,9 +187,12 @@ impl Actor for Task {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        self.io = Some(serialport::new("/dev/ttyACM0", 115_200)
-        .timeout(Duration::from_millis(10))
-        .open().expect("Failed to open port"));
+        self.io = Some(
+            serialport::new("/dev/ttyACM0", 115_200)
+                .timeout(Duration::from_millis(10))
+                .open()
+                .expect("Failed to open port"),
+        );
 
         /// go
         start_main_loop!(1000, ctx);

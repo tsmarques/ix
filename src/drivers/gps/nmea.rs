@@ -140,7 +140,7 @@ impl Parser {
                             expected: self.checksum,
                             received: self.read_checksum,
                         })
-                    }
+                    };
                 }
             }
         }
@@ -152,12 +152,12 @@ impl Parser {
 mod utils {
     use std::num::ParseIntError;
 
-    pub fn xor(current :i32, c :char) -> i32 {
+    pub fn xor(current: i32, c: char) -> i32 {
         let ascii = c as i32;
         current ^ ascii
     }
 
-    pub fn parse_checksum(hexstr :&str) -> Result<i32, ParseIntError> {
+    pub fn parse_checksum(hexstr: &str) -> Result<i32, ParseIntError> {
         i32::from_str_radix(hexstr, 16)
     }
 }
@@ -185,7 +185,7 @@ mod tests {
             sntc: Sentence::from(&String::from("GGA")),
             bfr: "42".to_string(),
             checksum: 2,
-            read_checksum: 5
+            read_checksum: 5,
         };
 
         assert_ne!(parser.field, Field::Sync);
@@ -251,11 +251,12 @@ mod tests {
 
     #[test]
     fn full_valid_parse() {
-        let sentence = "$GPGGA,202530.00,5109.0262,N,11401.8407,W,5,40,0.5,1097.36,M,-17.00,M,18,TSTR*61";
+        let sentence =
+            "$GPGGA,202530.00,5109.0262,N,11401.8407,W,5,40,0.5,1097.36,M,-17.00,M,18,TSTR*61";
         let mut parser = Parser::new();
 
         // parse full sentence
-        let mut ret :Result<Sentence, State> = Err(OnGoing);
+        let mut ret: Result<Sentence, State> = Err(OnGoing);
         for c in sentence.chars() {
             ret = parser.push(c);
         }

@@ -6,7 +6,7 @@ use std::io::{BufRead, Error};
 pub enum ReadResult {
     Empty,
     InvalidFormat,
-    InternalError
+    InternalError,
 }
 
 impl fmt::Display for ReadResult {
@@ -20,21 +20,21 @@ impl fmt::Display for ReadResult {
 }
 
 pub struct FieldReader {
-    data :std::io::Cursor<String>,
-    sep :char,
+    data: std::io::Cursor<String>,
+    sep: char,
 }
 
 impl FieldReader {
-    pub fn new(data_str :String, separator: char) -> FieldReader {
+    pub fn new(data_str: String, separator: char) -> FieldReader {
         FieldReader {
             data: std::io::Cursor::new(data_str),
-            sep: separator
+            sep: separator,
         }
     }
 
     /// Skip next field
     pub fn skip(&mut self) -> bool {
-        let mut bfr :Vec<u8> = vec![];
+        let mut bfr: Vec<u8> = vec![];
         return self.data.read_until(self.sep as u8, &mut bfr).is_ok() && bfr.len() != 0;
     }
 
@@ -43,19 +43,17 @@ impl FieldReader {
     pub fn read_optional<T: std::str::FromStr>(&mut self) -> Result<Option<T>, ReadResult> {
         match self.read() {
             Ok(v) => Ok(Some(v)),
-            Err(e) => {
-                match e {
-                    ReadResult::Empty => Ok(None),
-                    _ => Err(e)
-                }
-            }
+            Err(e) => match e {
+                ReadResult::Empty => Ok(None),
+                _ => Err(e),
+            },
         }
     }
 
     /// Read next value of the given type.
     /// This method assumes that and empty value is not allowed hence an error
     /// ReadResult::Empty is returned in such a case
-    pub fn read<T:  std::str::FromStr>(&mut self) -> Result<T, ReadResult> {
+    pub fn read<T: std::str::FromStr>(&mut self) -> Result<T, ReadResult> {
         let data_str = self.next()?;
 
         if let Ok(value) = data_str.parse::<T>() {
@@ -68,7 +66,7 @@ impl FieldReader {
     /// Fetch the next string up to separator
     /// Also removes the separator if it exists
     fn next(&mut self) -> Result<String, ReadResult> {
-        let mut bfr :Vec<u8> = vec![];
+        let mut bfr: Vec<u8> = vec![];
         return match self.data.read_until(self.sep as u8, &mut bfr) {
             Ok(v) => {
                 if v == 0 {
@@ -85,8 +83,8 @@ impl FieldReader {
                     }
                 }
             }
-            Err(_) => { Err(ReadResult::InternalError) }
-        }
+            Err(_) => Err(ReadResult::InternalError),
+        };
     }
 }
 
@@ -101,7 +99,6 @@ mod tests {
 
         assert!(ret.is_err());
         assert!(matches!(ret.err().unwrap(), ReadResult::Empty));
-
     }
 
     #[test]
@@ -291,6 +288,5 @@ mod tests {
 
         // nothing more to skip
         assert!(!reader.skip());
-
     }
 }
