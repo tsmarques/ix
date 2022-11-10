@@ -104,7 +104,10 @@ impl Task {
                     && m.alt.is_some()
                     && m.sat.is_some()
                 {
-                    self.fix._height += m.gsep.unwrap();
+                    if let Some(gsep) = m.gsep {
+                        self.fix._height += gsep;
+                    }
+
                     self.fix._lat = self.fix._lat.to_radians();
                     self.fix._lon = self.fix._lon.to_radians();
                     self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_POS as u16);
