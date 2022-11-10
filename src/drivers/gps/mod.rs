@@ -20,6 +20,7 @@ use crate::TaskBehaviour;
 mod field_reader;
 mod nmea;
 mod sentences;
+mod tests;
 
 // Task fields' definition
 pub struct Task {
