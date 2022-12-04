@@ -13,15 +13,23 @@ use imc::Message::Message;
 use serialport::SerialPort;
 
 use crate::drivers::gps::nmea::{Sentence, State};
-use crate::task;
+use crate::ix::Parameter;
 use crate::BrokerType;
 use crate::MessageWrapper;
 use crate::TaskBehaviour;
+use crate::{ix, task};
 
 mod field_reader;
 mod nmea;
 mod sentences;
 mod tests;
+
+#[derive(Default)]
+pub struct Configuration {
+    pub io_dev: Parameter<String>,
+    pub baud: Parameter<u32>,
+    pub io_timeout: Parameter<u64>,
+}
 
 // Task fields' definition
 pub struct Task {
@@ -30,6 +38,7 @@ pub struct Task {
     pub parser: nmea::Parser,
     pub io: Option<Box<dyn SerialPort>>,
     pub bfr: String,
+    cfg: Configuration,
 }
 
 // Task Trait implementation
@@ -41,6 +50,26 @@ impl TaskBehaviour for Task {
 
     fn get_name(&self) -> &str {
         "GPS Driver"
+    }
+
+    fn register_configuration(&mut self) {
+        self.cfg
+            .io_dev
+            .name("IO Device")
+            .default(String::from("/dev/ttyUSB0"))
+            .description("IO port used to connect to the device");
+
+        self.cfg
+            .baud
+            .name("IO - Baud Rate")
+            .default(115200)
+            .description("Baud rate applied to the device");
+
+        self.cfg
+            .io_timeout
+            .name("IO - Communications Timeout")
+            .default(10)
+            .description("In milliseconds");
     }
 }
 
@@ -54,6 +83,7 @@ impl Task {
             parser: nmea::Parser::new(),
             io: None,
             bfr: String::from(""),
+            cfg: Default::default(),
         }
     }
 
@@ -193,8 +223,8 @@ impl Actor for Task {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         self.io = Some(
-            serialport::new("/dev/ttyACM0", 115_200)
-                .timeout(Duration::from_millis(10))
+            serialport::new(self.cfg.io_dev.get(), *self.cfg.baud.get())
+                .timeout(Duration::from_millis(*self.cfg.io_timeout.get()))
                 .open()
                 .expect("Failed to open port"),
         );

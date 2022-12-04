@@ -12,6 +12,8 @@ use task::TaskBehaviour;
 mod task;
 mod drivers;
 
+mod ix;
+
 type BrokerType = SystemBroker;
 
 fn main() {

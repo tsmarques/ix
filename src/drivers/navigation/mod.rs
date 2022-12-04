@@ -27,12 +27,14 @@ impl TaskBehaviour for Task {
     fn get_name(&self) -> &str {
         "Navigation Monitor"
     }
+
+    fn register_configuration(&mut self) {
+        todo!()
+    }
 }
 
 impl Task {
-    fn on_main(&mut self, _context: &mut Context<Self>) {
-        self.issue_async::<BrokerType, MessageWrapper<u16>>(MessageWrapper { 0: 2 });
-    }
+    fn on_main(&mut self, _context: &mut Context<Self>) {}
 }
 
 impl Actor for Task {
@@ -54,7 +56,7 @@ impl Handler<MessageWrapper<GpsFix>> for Task {
     type Result = ();
 
     fn handle(&mut self, msg: MessageWrapper<GpsFix>, _ctx: &mut Self::Context) {
-        println!("Navigation Received: {:?}", msg.0._header._mgid);
+        println!("nav: {:?}", msg.0._header._mgid);
     }
 }
 

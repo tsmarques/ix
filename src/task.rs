@@ -44,6 +44,8 @@ pub trait TaskBehaviour {
     fn get_ctx(&self) -> &Context;
     fn get_name(&self) -> &str;
 
+    fn register_configuration(&mut self);
+
     fn wait_start(&self) {
         self.get_ctx().barrier.wait();
     }
