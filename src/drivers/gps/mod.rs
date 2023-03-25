@@ -7,9 +7,9 @@ use std::{thread, time};
 
 use actix::prelude::*;
 use actix_broker::{BrokerIssue, BrokerSubscribe, SystemBroker};
-use imc::DevDataText::DevDataText;
-use imc::GpsFix::GpsFix;
-use imc::Message::Message;
+use imc::DevDataText;
+use imc::GpsFix;
+use imc::Message;
 use serialport::SerialPort;
 
 use crate::drivers::gps::nmea::{Sentence, State};
@@ -123,11 +123,13 @@ impl Task {
             Sentence::GGA(m) => {
                 println!("debug: GGA");
                 if m.validity == 1 {
-                    self.fix._type = imc::GpsFix::TypeEnum::GFT_STANDALONE as u8;
-                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_POS as u16);
+                    self.fix._type = imc::messages::GpsFix::TypeEnum::GFT_STANDALONE as u8;
+                    self.fix._validity |=
+                        (imc::messages::GpsFix::ValidityBits::GFV_VALID_POS as u16);
                 } else if m.validity == 2 {
-                    self.fix._type = imc::GpsFix::TypeEnum::GFT_DIFFERENTIAL as u8;
-                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_POS as u16);
+                    self.fix._type = imc::messages::GpsFix::TypeEnum::GFT_DIFFERENTIAL as u8;
+                    self.fix._validity |=
+                        (imc::messages::GpsFix::ValidityBits::GFV_VALID_POS as u16);
                 }
 
                 if self.handle_latitude(m.lat, m.ns)
@@ -141,14 +143,17 @@ impl Task {
 
                     self.fix._lat = self.fix._lat.to_radians();
                     self.fix._lon = self.fix._lon.to_radians();
-                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_POS as u16);
+                    self.fix._validity |=
+                        (imc::messages::GpsFix::ValidityBits::GFV_VALID_POS as u16);
                 } else {
-                    self.fix._validity &= !(imc::GpsFix::ValidityBits::GFV_VALID_POS as u16);
+                    self.fix._validity &=
+                        !(imc::messages::GpsFix::ValidityBits::GFV_VALID_POS as u16);
                 }
 
                 if let Some(hdop) = m.hdop {
                     self.fix._hdop = hdop;
-                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_HDOP as u16);
+                    self.fix._validity |=
+                        (imc::messages::GpsFix::ValidityBits::GFV_VALID_HDOP as u16);
                 }
             }
             Sentence::VTG(m) => {
@@ -156,23 +161,27 @@ impl Task {
                 if let Some(cog) = m.cog_true {
                     //@todo normalize angles
                     self.fix._cog = cog.to_radians();
-                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_COG as u16);
+                    self.fix._validity |=
+                        (imc::messages::GpsFix::ValidityBits::GFV_VALID_COG as u16);
                 }
 
                 if let Some(sog) = m.sog_kph {
                     // to mps
                     self.fix._sog = sog * 1000.0 / 3600.0;
-                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_SOG as u16);
+                    self.fix._validity |=
+                        (imc::messages::GpsFix::ValidityBits::GFV_VALID_SOG as u16);
                 }
             }
             Sentence::RMC(m) => println!("RMC"),
             Sentence::ZDA(m) => {
                 if m.utc.is_some() {
-                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_TIME as u16);
+                    self.fix._validity |=
+                        (imc::messages::GpsFix::ValidityBits::GFV_VALID_TIME as u16);
                 }
 
                 if m.day.is_some() && m.month.is_some() && m.year.is_some() {
-                    self.fix._validity |= (imc::GpsFix::ValidityBits::GFV_VALID_TIME as u16);
+                    self.fix._validity |=
+                        (imc::messages::GpsFix::ValidityBits::GFV_VALID_TIME as u16);
                 }
             }
         }
@@ -193,7 +202,7 @@ impl Task {
                 /// Log received sentence
                 let mut log = DevDataText::new();
                 log._value = self.bfr.clone();
-                send_message!(self, imc::DevDataText::DevDataText, log);
+                send_message!(self, imc::DevDataText, log);
 
                 // reset state
                 self.parser.reset();

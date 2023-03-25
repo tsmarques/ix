@@ -1,2 +1,2 @@
 pub mod gps;
-pub mod navigation;
+pub mod logger;

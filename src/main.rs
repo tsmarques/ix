@@ -29,15 +29,13 @@ fn main() {
         barrier: Arc::clone(&task_barrier),
     });
 
-    let nav_task = drivers::navigation::Task {
-        ctx: task::Context {
-            running: Arc::clone(&task_flag),
-            barrier: Arc::clone(&task_barrier),
-        },
-    };
+    let logger_task = drivers::logger::Task::new(task::Context {
+        running: Arc::clone(&task_flag),
+        barrier: Arc::clone(&task_barrier),
+    });
 
     sys.block_on(async {
-        nav_task.start();
+        logger_task.start();
         gps_task.start();
     });
     sys.run().unwrap();
