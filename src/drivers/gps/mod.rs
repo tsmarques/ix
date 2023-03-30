@@ -53,10 +53,12 @@ impl TaskBehaviour for Task {
     }
 
     fn register_configuration(&mut self) {
+        println!("registering parameters");
+
         self.cfg
             .io_dev
             .name("IO Device")
-            .default(String::from("/dev/ttyUSB0"))
+            .default(String::from("/dev/ttyACM0"))
             .description("IO port used to connect to the device");
 
         self.cfg
@@ -231,6 +233,12 @@ impl Actor for Task {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        println!(
+            "opening {} with {}",
+            self.cfg.io_dev.get(),
+            *self.cfg.baud.get()
+        );
+
         self.io = Some(
             serialport::new(self.cfg.io_dev.get(), *self.cfg.baud.get())
                 .timeout(Duration::from_millis(*self.cfg.io_timeout.get()))

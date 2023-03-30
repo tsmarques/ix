@@ -1,6 +1,6 @@
 #[derive(Default)]
 pub struct Parameter<T> {
-    value: T,
+    value: Option<T>,
     def_value: T,
     name: &'static str,
     description: &'static str,
@@ -8,7 +8,7 @@ pub struct Parameter<T> {
 
 impl<T> Parameter<T> {
     pub fn set(&mut self, v: T) -> &mut Self {
-        self.value = v;
+        self.value = Some(v);
         self
     }
 
@@ -19,7 +19,11 @@ impl<T> Parameter<T> {
     }
 
     pub fn get(&self) -> &T {
-        &self.value
+        if self.value.is_none() {
+            &self.def_value
+        } else {
+            &self.value.as_ref().unwrap()
+        }
     }
 
     pub fn default(&mut self, v: T) -> &mut Self {
